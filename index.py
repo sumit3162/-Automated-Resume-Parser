@@ -1,100 +1,174 @@
 from pathlib import Path
 
-# Create a Jupyter Notebook structure
-from nbformat import v4 as nbf
+# Define the code content for the Jupyter Notebook
+notebook_code = """
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "!pip install Flask flask_sqlalchemy pyjwt bcrypt psycopg2-binary"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from flask import Flask, request, jsonify\\n",
+    "from flask_sqlalchemy import SQLAlchemy\\n",
+    "import bcrypt\\n",
+    "import jwt\\n",
+    "import datetime"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Initialize Flask app\\n",
+    "app = Flask(__name__)\\n",
+    "\\n",
+    "# Secret key for JWT\\n",
+    "app.config['SECRET_KEY'] = 'your_secret_key'\\n",
+    "# PostgreSQL configuration (Replace with actual credentials)\\n",
+    "app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://username:password@localhost/dbname'\\n",
+    "db = SQLAlchemy(app)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# User model\\n",
+    "class User(db.Model):\\n",
+    "    id = db.Column(db.Integer, primary_key=True)\\n",
+    "    username = db.Column(db.String(80), unique=True, nullable=False)\\n",
+    "    password = db.Column(db.LargeBinary, nullable=False)\\n",
+    "\\n",
+    "# Create tables\\n",
+    "with app.app_context():\\n",
+    "    db.create_all()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Register route\\n",
+    "@app.route('/register', methods=['POST'])\\n",
+    "def register():\\n",
+    "    data = request.get_json()\\n",
+    "    username = data['username']\\n",
+    "    password = data['password'].encode('utf-8')\\n",
+    "\\n",
+    "    if User.query.filter_by(username=username).first():\\n",
+    "        return jsonify({'message': 'Username already exists'}), 409\\n",
+    "\\n",
+    "    hashed_pw = bcrypt.hashpw(password, bcrypt.gensalt())\\n",
+    "    new_user = User(username=username, password=hashed_pw)\\n",
+    "\\n",
+    "    db.session.add(new_user)\\n",
+    "    db.session.commit()\\n",
+    "\\n",
+    "    return jsonify({'message': 'User registered successfully'}), 201"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Login route\\n",
+    "@app.route('/login', methods=['POST'])\\n",
+    "def login():\\n",
+    "    data = request.get_json()\\n",
+    "    username = data['username']\\n",
+    "    password = data['password'].encode('utf-8')\\n",
+    "\\n",
+    "    user = User.query.filter_by(username=username).first()\\n",
+    "\\n",
+    "    if user and bcrypt.checkpw(password, user.password):\\n",
+    "        token = jwt.encode({\\n",
+    "            'user_id': user.id,\\n",
+    "            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)\\n",
+    "        }, app.config['SECRET_KEY'], algorithm='HS256')\\n",
+    "\\n",
+    "        return jsonify({'token': token}), 200\\n",
+    "    else:\\n",
+    "        return jsonify({'message': 'Invalid credentials'}), 401"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Protected route\\n",
+    "@app.route('/protected', methods=['GET'])\\n",
+    "def protected():\\n",
+    "    token = request.headers.get('Authorization')\\n",
+    "\\n",
+    "    if not token:\\n",
+    "        return jsonify({'message': 'Token is missing!'}), 403\\n",
+    "\\n",
+    "    try:\\n",
+    "        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])\\n",
+    "        user = User.query.get(data['user_id'])\\n",
+    "    except:\\n",
+    "        return jsonify({'message': 'Token is invalid or expired!'}), 403\\n",
+    "\\n",
+    "    return jsonify({'message': f'Welcome {user.username}!'}), 200"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Run Flask app\\n",
+    "from threading import Thread\\n",
+    "\\n",
+    "def run_app():\\n",
+    "    app.run(port=5000)\\n",
+    "\\n",
+    "thread = Thread(target=run_app)\\n",
+    "thread.start()"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": ""
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
+"""
 
-notebook = nbf.new_notebook()
+# Save to .ipynb file
+file_path = Path("secure_auth_system.ipynb")
+file_path.write_text(notebook_code)
 
-notebook.cells = [
+file_path
 
-    nbf.new_markdown_cell("### 🧠 **Automated Resume Parser**\n"
-                          "**Project Goal:** Automatically extract structured information (name, skills, education, etc.) from resumes (PDF/DOCX) and store it in a PostgreSQL database."),
-
-    nbf.new_markdown_cell("#### 📌 **Technologies Used**\n"
-                          "- Python\n"
-                          "- spaCy\n"
-                          "- PDFPlumber\n"
-                          "- python-docx\n"
-                          "- Flask (for optional API integration)\n"
-                          "- PostgreSQL"),
-
-    nbf.new_code_cell("import spacy\n"
-                      "import pdfplumber\n"
-                      "import docx\n"
-                      "import psycopg2\n"
-                      "import re"),
-
-    nbf.new_markdown_cell("### 📄 **Function to Extract Text from PDF**"),
-    nbf.new_code_cell("def extract_text_from_pdf(file_path):\n"
-                      "    text = \"\"\n"
-                      "    with pdfplumber.open(file_path) as pdf:\n"
-                      "        for page in pdf.pages:\n"
-                      "            text += page.extract_text()\n"
-                      "    return text"),
-
-    nbf.new_markdown_cell("### 📄 **Function to Extract Text from DOCX**"),
-    nbf.new_code_cell("def extract_text_from_docx(file_path):\n"
-                      "    doc = docx.Document(file_path)\n"
-                      "    return \"\\n\".join([para.text for para in doc.paragraphs])"),
-
-    nbf.new_markdown_cell("### 🧠 **NLP-Based Info Extraction using spaCy**"),
-    nbf.new_code_cell("nlp = spacy.load(\"en_core_web_sm\")\n\n"
-                      "def extract_entities(text):\n"
-                      "    doc = nlp(text)\n"
-                      "    entities = {\"PERSON\": [], \"ORG\": [], \"EDUCATION\": [], \"SKILLS\": []}\n\n"
-                      "    for ent in doc.ents:\n"
-                      "        if ent.label_ == \"PERSON\":\n"
-                      "            entities[\"PERSON\"].append(ent.text)\n"
-                      "        elif ent.label_ == \"ORG\":\n"
-                      "            entities[\"ORG\"].append(ent.text)\n"
-                      "    return entities"),
-
-    nbf.new_markdown_cell("### ⚙️ **Custom Skill Extraction (Regex/Keyword Match)**"),
-    nbf.new_code_cell("def extract_skills(text, skill_set):\n"
-                      "    skills_found = []\n"
-                      "    for skill in skill_set:\n"
-                      "        if re.search(rf\"\\b{re.escape(skill)}\\b\", text, re.IGNORECASE):\n"
-                      "            skills_found.append(skill)\n"
-                      "    return list(set(skills_found))\n\n"
-                      "skills_db = ['Python', 'Machine Learning', 'SQL', 'Flask', 'NLP']"),
-
-    nbf.new_markdown_cell("### 🛢️ **Store Extracted Data in PostgreSQL**"),
-    nbf.new_code_cell("def store_in_db(data):\n"
-                      "    conn = psycopg2.connect(\n"
-                      "        dbname=\"resume_db\",\n"
-                      "        user=\"postgres\",\n"
-                      "        password=\"your_password\",\n"
-                      "        host=\"localhost\",\n"
-                      "        port=\"5432\"\n"
-                      "    )\n"
-                      "    cursor = conn.cursor()\n\n"
-                      "    insert_query = \"\"\"\n"
-                      "    INSERT INTO resumes (name, skills, education, organization)\n"
-                      "    VALUES (%s, %s, %s, %s)\n"
-                      "    \"\"\"\n"
-                      "    cursor.execute(insert_query, (data['PERSON'][0], \n"
-                      "                                  \", \".join(data['SKILLS']), \n"
-                      "                                  \", \".join(data['EDUCATION']), \n"
-                      "                                  \", \".join(data['ORG'])))\n\n"
-                      "    conn.commit()\n"
-                      "    cursor.close()\n"
-                      "    conn.close()"),
-
-    nbf.new_markdown_cell("### ✅ **End-to-End Execution**"),
-    nbf.new_code_cell("file_path = \"sample_resume.pdf\"  # or .docx\n"
-                      "text = extract_text_from_pdf(file_path)\n"
-                      "entities = extract_entities(text)\n"
-                      "entities[\"SKILLS\"] = extract_skills(text, skills_db)\n\n"
-                      "store_in_db(entities)"),
-
-    nbf.new_markdown_cell("### 🔍 **Output Example**"),
-    nbf.new_code_cell("print(entities)")
-]
-
-# Save the notebook
-output_path = "Automated_Resume_Parser.ipynb"
-with open(output_path, "w", encoding="utf-8") as f:
-    import nbformat
-    nbformat.write(notebook, f)
-
-output_path
